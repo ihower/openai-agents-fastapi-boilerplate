@@ -14,7 +14,7 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-from agents import Runner, trace
+from agents import Runner, trace, ItemHelpers
 from custom_sqlite_session import CustomSQLiteSession
 from agent_core import (
     CustomAgentContext,
@@ -44,6 +44,8 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
     custom_agent_context = CustomAgentContext(search_source={})
 
     chunks_result = []
+    tags = []
+
     with braintrust_logger.start_span(name="agent_v3") as braintrust_span:        
         with trace("FastAPI Agent v3", trace_id=f"trace_{thread_id}"):
 
@@ -56,6 +58,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                 content = { "content": result.final_output.refusal_answer }                
                 yield f"data: {json.dumps(content)}\n\n"
                 chunks_result.append(content)
+                tags.append("gg")
             else:
 
                 follow_up_questions_task = asyncio.create_task(  Runner.run(extract_followup_questions_agent, input=query, session=session) )
@@ -68,7 +71,6 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                         #print(event.data.delta)
                         data = { "content": event.data.delta }
                         yield f"data: {json.dumps(data)}\n\n"
-                        chunks_result.append(data)
 
                     elif event.type == "raw_response_event" and event.data.type == "response.output_item.added" and event.data.item.type == "reasoning":
                         think_chunk = {
@@ -83,15 +85,8 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                         }
                         yield f"data: {json.dumps(think_chunk)}\n\n"   
                         chunks_result.append(think_chunk)
-                    elif event.type == "raw_response_event" and event.data.type == "response.completed":
-                        follow_up_questions_result = await follow_up_questions_task
-                        questions = follow_up_questions_result.final_output_as(ExtractFollowupQuestionsResult).followup_questions
-                        data = { "following_questions": questions }
-                        
-                        yield f"data: {json.dumps(data)}\n\n"
-                        chunks_result.append(data)
-
                     elif event.type == "run_item_stream_event":
+                        print(f"-------------------------------- run_item_stream_event --------------------------------: {event.item.type}")
                         if event.item.type == "tool_call_item":
                             print("-- Tool was called")
                             tool_data = {'message': 'CALL_TOOL', 'tool_name': str(event.item.raw_item.name), 'arguments': str(event.item.raw_item.arguments)}
@@ -103,15 +98,24 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                             print(f"search_source: {result.context_wrapper.context.search_source}") # 也可以看到最新更新後的 context (這個沒有傳給 LLM，只是我們內部用)
 
                         elif event.item.type == "message_output_item":
-                            pass
+                            data = { "content": ItemHelpers.text_message_output(event.item) }
+                            chunks_result.append(data)
                         else:
                             pass  # Ignore other event types          
+
+
+        follow_up_questions_result = await follow_up_questions_task
+        questions = follow_up_questions_result.final_output_as(ExtractFollowupQuestionsResult).followup_questions
+        data = { "following_questions": questions }
+        
+        yield f"data: {json.dumps(data)}\n\n"
+        chunks_result.append(data)
 
         done_event = { "message": "DONE" }
         yield f"data: {json.dumps(done_event)}\n\n"
         chunks_result.append(done_event)
 
-        braintrust_span.log(output={ "chunks": chunks_result })
+        braintrust_span.log(output={ "chunks": chunks_result }, tags=tags)
 
                             
         print(f"result: {result.context_wrapper}")

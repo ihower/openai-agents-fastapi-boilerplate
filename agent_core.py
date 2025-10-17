@@ -1,0 +1,81 @@
+from dataclasses import dataclass
+from pydantic import BaseModel, Field
+from agents import Agent, function_tool, RunContextWrapper, ModelSettings
+from tavily import AsyncTavilyClient
+from datetime import datetime
+
+# Initialize Tavily client
+tavily_client = AsyncTavilyClient()
+
+# Custom Agent Context
+@dataclass
+class CustomAgentContext:
+    search_source: dict
+
+# Function Tools
+@function_tool
+async def knowledge_search(wrapper: RunContextWrapper[CustomAgentContext], query: str) -> str:
+    """
+    Search the web for information
+
+    Args:
+        query: The query keyword to search the web for.
+    """
+
+    print(f"  ⚙️ Calling knowledge_search with query: {query}")
+
+    response = await tavily_client.search(query)
+
+    wrapper.context.search_source[query] = response
+
+    result = [ x["content"] for x in response["results"] ]
+
+    print(f"  ⚙️ knowledge_search result: {result}")
+
+    return str(result)
+
+# Pydantic Models
+class GuardrailResult(BaseModel):
+    is_investment_question: bool
+    refusal_answer: str = Field(description="The answer to the user's question if is_investment_question is False, otherwise leave it blank.")
+
+class ExtractFollowupQuestionsResult(BaseModel):
+    followup_questions: list[str] = Field(description="3 follow-up questions exploring different aspects of the topic.")
+
+# Agent Factory Functions
+def create_guardrail_agent() -> Agent:
+    """Create and return a guardrail agent instance"""
+    return Agent(
+        name="Guardrail Agent",
+        instructions="""Your task is to determine if the user's question is related to investment or finance.
+If yes, return "is_investment_question": true.
+If not, return "is_investment_question": false and "refusal_answer": 解釋為何我不能回答這個問題. Always respond in Traditional Chinese.
+""",
+        model="gpt-4.1-mini",
+        output_type=GuardrailResult,
+    )
+
+def create_followup_questions_agent() -> Agent:
+    """Create and return a follow-up questions extraction agent instance"""
+    return Agent(
+        name="Extract Followup Questions Agent",
+        instructions="""Your task is to extract 3 follow-up questions from the user's question and return them as "followup_questions": ["question1", "question2", "question3"].""",
+        model="gpt-4.1",
+        output_type=ExtractFollowupQuestionsResult,
+    )
+
+def create_lead_agent() -> Agent[CustomAgentContext]:
+    """Create and return a lead agent instance"""
+    today = datetime.now().strftime("%Y-%m-%d")
+    return Agent[CustomAgentContext](
+        name="Lead Agent",
+        instructions=f"""You are a helpful assistant that can answer questions and help with tasks. Always respond in Traditional Chinese. Today's date is {today}.""",
+        tools=[knowledge_search],
+        model="gpt-5-mini",
+        model_settings=ModelSettings(
+            reasoning={
+                "effort": "low",
+                "summary": "auto"
+            }
+        )
+    )

@@ -1,0 +1,15 @@
+[project]
+name = "openai-agents-sdk-fastapi-boilerplate"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi[standard]>=0.119.0",
+    "ipykernel>=7.0.1",
+    "openai>=1.109.1",
+    "openai-agents>=0.3.3",
+    "python-dotenv>=1.1.1",
+    "tavily-python>=0.7.12",
+    "tiktoken>=0.12.0",
+]

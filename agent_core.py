@@ -1,11 +1,27 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from agents import Agent, function_tool, RunContextWrapper, ModelSettings
+from agents import Agent, function_tool, RunContextWrapper, ModelSettings, set_default_openai_client
 from tavily import AsyncTavilyClient
 from datetime import datetime
+from openai import AsyncOpenAI
+import braintrust
+import os
 
-# Initialize Tavily client
-tavily_client = AsyncTavilyClient()
+braintrust_logger = None
+openai_client = None
+
+def init_braintrust():
+    global braintrust_logger, openai_client
+    braintrust_logger = braintrust.init_logger(project=os.getenv("BRAINTRUST_PROJECT"))
+    openai_client = braintrust.wrap_openai(AsyncOpenAI())
+    set_default_openai_client(openai_client) # 設定 OpenAI Agents SDK 預設的 OpenAI Client 改用 braintrust 包裝過的版本
+    return braintrust_logger, openai_client
+
+tavily_client = None
+def get_tavily_client():
+    global tavily_client
+    tavily_client = AsyncTavilyClient()
+    return tavily_client
 
 # Custom Agent Context
 @dataclass
@@ -14,6 +30,7 @@ class CustomAgentContext:
 
 # Function Tools
 @function_tool
+@braintrust.traced
 async def knowledge_search(wrapper: RunContextWrapper[CustomAgentContext], query: str) -> str:
     """
     Search the web for information
@@ -24,7 +41,7 @@ async def knowledge_search(wrapper: RunContextWrapper[CustomAgentContext], query
 
     print(f"  ⚙️ Calling knowledge_search with query: {query}")
 
-    response = await tavily_client.search(query)
+    response = await get_tavily_client().search(query)
 
     wrapper.context.search_source[query] = response
 

@@ -85,8 +85,20 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                         }
                         yield f"data: {json.dumps(think_chunk)}\n\n"   
                         chunks_result.append(think_chunk)
+                    elif event.type == "raw_response_event" and event.data.type == "response.completed":
+                        print("completed")
+                        last_response_id = event.data.response.id 
+                       
+                        token_usage = {
+                            "input_tokens": event.data.response.usage.input_tokens,
+                            "cached_tokens": event.data.response.usage.input_tokens_details.cached_tokens,
+                            "output_tokens": event.data.response.usage.output_tokens,
+                            "reasoning_tokens": event.data.response.usage.output_tokens_details.reasoning_tokens,
+                            "total_tokens": event.data.response.usage.total_tokens,
+                        }
+                        
+                        print(f"-- Token usage: {token_usage}")                    
                     elif event.type == "run_item_stream_event":
-                        print(f"-------------------------------- run_item_stream_event --------------------------------: {event.item.type}")
                         if event.item.type == "tool_call_item":
                             print("-- Tool was called")
                             tool_data = {'message': 'CALL_TOOL', 'tool_name': str(event.item.raw_item.name), 'arguments': str(event.item.raw_item.arguments)}
@@ -103,7 +115,6 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                         else:
                             pass  # Ignore other event types          
 
-
         follow_up_questions_result = await follow_up_questions_task
         questions = follow_up_questions_result.final_output_as(ExtractFollowupQuestionsResult).followup_questions
         data = { "following_questions": questions }
@@ -115,7 +126,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
         yield f"data: {json.dumps(done_event)}\n\n"
         chunks_result.append(done_event)
 
-        braintrust_span.log(output={ "chunks": chunks_result }, tags=tags)
+        braintrust_span.log(output={ "chunks": chunks_result }, tags=tags, metadata={ "token_usage": token_usage })
 
                             
         print(f"result: {result.context_wrapper}")

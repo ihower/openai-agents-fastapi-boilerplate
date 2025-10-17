@@ -8,6 +8,7 @@ dependencies = [
     "autoevals>=0.0.130",
     "braintrust>=0.3.1",
     "fastapi[standard]>=0.119.0",
+    "gunicorn>=23.0.0",
     "ipykernel>=7.0.1",
     "openai>=1.109.1",
     "openai-agents>=0.3.3",

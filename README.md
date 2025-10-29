@@ -42,8 +42,16 @@ uv run uvicorn main:app --reload
 
 ### Using Docker
 
+Set up `.env` first, then run:
+
 ```bash
-docker compose up -d
+docker compose up
+```
+
+If you change the app code, you need to rebuild:
+
+```bash
+docker compose build
 ```
 
 ### Local

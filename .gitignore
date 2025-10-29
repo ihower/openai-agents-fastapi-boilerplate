@@ -6,6 +6,6 @@ dist/
 wheels/
 *.egg-info
 .env
-conversations.db
+data/*
 # Virtual environments
 .venv

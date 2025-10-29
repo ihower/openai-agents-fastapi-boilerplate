@@ -12,6 +12,8 @@ A FastAPI boilerplate integrating OpenAI Agents SDK with Braintrust observabilit
 
 ## Setup
 
+### Local Development
+
 1. Copy environment template:
 ```bash
 cp .env.example .env
@@ -19,19 +21,32 @@ cp .env.example .env
 
 2. Edit `.env` and add your API keys
 
-3. Install dependencies:
+3. Create data directory:
+```bash
+mkdir -p data
+```
+
+4. Install dependencies:
 ```bash
 uv sync
 ```
 
-4. Run development server:
+5. Run development server:
 ```bash
 uv run uvicorn main:app --reload
 ```
 
-5. Open http://localhost:8000/static/agent.html
+6. Open http://localhost:8000/static/agent.html
 
 ## Production
+
+### Using Docker
+
+```bash
+docker compose up -d
+```
+
+### Local
 
 Run with multiple workers using Gunicorn:
 
@@ -39,6 +54,6 @@ Run with multiple workers using Gunicorn:
 uv run gunicorn main:app \
   --workers 3 \
   --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:7860 \
+  --bind 0.0.0.0:8000 \
   --timeout 600
 ```

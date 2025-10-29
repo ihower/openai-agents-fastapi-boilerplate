@@ -40,7 +40,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
     extract_followup_questions_agent = create_followup_questions_agent()
     lead_agent = create_lead_agent()
 
-    session = CustomSQLiteSession(thread_id, "conversations.db", agent=lead_agent)
+    session = CustomSQLiteSession(thread_id, "data/conversations.db", agent=lead_agent)
     custom_agent_context = CustomAgentContext(search_source={})
 
     chunks_result = []

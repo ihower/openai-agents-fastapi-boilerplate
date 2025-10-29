@@ -58,7 +58,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                 content = { "content": result.final_output.refusal_answer }                
                 yield f"data: {json.dumps(content)}\n\n"
                 chunks_result.append(content)
-                tags.append("gg")
+                tags.append("gg") 
             else:
 
                 follow_up_questions_task = asyncio.create_task(  Runner.run(extract_followup_questions_agent, input=query, session=session) )
@@ -86,18 +86,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                         yield f"data: {json.dumps(think_chunk)}\n\n"   
                         chunks_result.append(think_chunk)
                     elif event.type == "raw_response_event" and event.data.type == "response.completed":
-                        print("completed")
-                        last_response_id = event.data.response.id 
-                       
-                        token_usage = {
-                            "input_tokens": event.data.response.usage.input_tokens,
-                            "cached_tokens": event.data.response.usage.input_tokens_details.cached_tokens,
-                            "output_tokens": event.data.response.usage.output_tokens,
-                            "reasoning_tokens": event.data.response.usage.output_tokens_details.reasoning_tokens,
-                            "total_tokens": event.data.response.usage.total_tokens,
-                        }
-                        
-                        print(f"-- Token usage: {token_usage}")                    
+                        print("completed")          
                     elif event.type == "run_item_stream_event":
                         if event.item.type == "tool_call_item":
                             print("-- Tool was called")
@@ -115,18 +104,19 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                         else:
                             pass  # Ignore other event types          
 
-        follow_up_questions_result = await follow_up_questions_task
-        questions = follow_up_questions_result.final_output_as(ExtractFollowupQuestionsResult).followup_questions
-        data = { "following_questions": questions }
+                follow_up_questions_result = await follow_up_questions_task
+                questions = follow_up_questions_result.final_output_as(ExtractFollowupQuestionsResult).followup_questions
+                data = { "following_questions": questions }
         
-        yield f"data: {json.dumps(data)}\n\n"
-        chunks_result.append(data)
+                yield f"data: {json.dumps(data)}\n\n"
+                chunks_result.append(data)
 
-        done_event = { "message": "DONE" }
-        yield f"data: {json.dumps(done_event)}\n\n"
-        chunks_result.append(done_event)
+            done_event = { "message": "DONE" }
+            yield f"data: {json.dumps(done_event)}\n\n"
+            chunks_result.append(done_event)
 
-        braintrust_span.log(output={ "chunks": chunks_result }, tags=tags, metadata={ "token_usage": token_usage })
+            token_usage = result.context_wrapper.usage
+            braintrust_span.log(output={ "chunks": chunks_result }, tags=tags, metadata={ "token_usage": token_usage })
 
                             
-        print(f"result: {result.context_wrapper}")
+    print(f"result: {result.context_wrapper}")

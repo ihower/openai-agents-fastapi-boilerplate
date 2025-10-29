@@ -67,6 +67,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
 
                 async for event in result.stream_events():
                     #print(event)
+
                     if event.type == "raw_response_event" and event.data.type == "response.output_text.delta":
                         #print(event.data.delta)
                         data = { "content": event.data.delta }
@@ -90,7 +91,12 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                     elif event.type == "run_item_stream_event":
                         if event.item.type == "tool_call_item":
                             print("-- Tool was called")
-                            tool_data = {'message': 'CALL_TOOL', 'tool_name': str(event.item.raw_item.name), 'arguments': str(event.item.raw_item.arguments)}
+
+                            if event.item.raw_item.type == "function_call":
+                                tool_data = {'message': 'CALL_TOOL', 'tool_name': str(event.item.raw_item.name), 'arguments': str(event.item.raw_item.arguments)}
+                            elif event.item.raw_item.type == "web_search_call": # build-in tool
+                                tool_data = {'message': 'CALL_TOOL', 'tool_name': 'web_search_call'}
+
                             yield f"data: {json.dumps(tool_data)}\n\n"
                             chunks_result.append(tool_data)
 

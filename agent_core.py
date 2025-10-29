@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from agents import Agent, function_tool, RunContextWrapper, ModelSettings, set_default_openai_client,  WebSearchTool
+from agents import Agent, function_tool, RunContextWrapper, ModelSettings, set_default_openai_client,  WebSearchTool, FileSearchTool
 from tavily import AsyncTavilyClient
 from datetime import datetime
 from openai import AsyncOpenAI
@@ -88,7 +88,13 @@ def create_lead_agent() -> Agent[CustomAgentContext]:
         name="Lead Agent",
         instructions=f"""You are a helpful assistant that can answer questions and help with tasks. Always respond in Traditional Chinese. Today's date is {today}.""",
         #tools=[knowledge_search],
-        tools=[WebSearchTool()],
+        tools=[
+            WebSearchTool(), 
+            #FileSearchTool(
+            #  max_num_results=5,
+            #  vector_store_ids=[os.getenv("OPENAI_VECTOR_STORE_ID")],                
+            #)
+        ],
         model="gpt-5-mini",
         model_settings=ModelSettings(
             reasoning={

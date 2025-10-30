@@ -77,7 +77,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
                 result = ta.result()
                 extract_conversation_metadata_data = tb.result()
 
-                if not result.final_output.is_investment_question:
+                if not result.final_output.allow:
                     content = { "content": result.final_output.refusal_answer }
                     yield f"data: {json.dumps(content)}\n\n"
                     chunks_result.append(content)

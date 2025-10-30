@@ -9,10 +9,23 @@ import os
 import asyncio
 import aiosqlite
 import json
+import pathlib
 from utils import count_tokens
+
+ROOT_DIR = pathlib.Path(__file__).parent.absolute()
 
 braintrust_logger = None
 openai_client = None
+
+# Load prompts from files
+_prompt_cache = {}
+def load_prompt(key: str) -> str:
+    if key not in _prompt_cache:
+        print(f"Loading prompt: {key}")
+        prompt_path = ROOT_DIR / "prompts" / f"{key}.md"
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            _prompt_cache[key] = f.read()
+    return _prompt_cache[key]
 
 async def get_previous_items(db, thread_id: str) -> tuple[list, dict]:
     """
@@ -202,8 +215,8 @@ async def knowledge_search(wrapper: RunContextWrapper[CustomAgentContext], query
     return str(result)
 
 class GuardrailResult(BaseModel):
-    is_investment_question: bool
-    refusal_answer: str = Field(description="The answer to the user's question if is_investment_question is False, otherwise leave it blank.")
+    allow: bool
+    refusal_answer: str = Field(description="The reply to the user's question if is_investment_question is False, otherwise leave it blank.")
 
 class ExtractFollowupQuestionsResult(BaseModel):
     followup_questions: list[str] = Field(description="3 follow-up questions exploring different aspects of the topic.")
@@ -213,10 +226,7 @@ def create_guardrail_agent() -> Agent:
     """Create and return a guardrail agent instance"""
     return Agent(
         name="Guardrail Agent",
-        instructions="""Your task is to determine if the user's question is related to investment or finance.
-If yes, return "is_investment_question": true.
-If not, return "is_investment_question": false and "refusal_answer": 解釋為何我不能回答這個問題. Always respond in Traditional Chinese.
-""",
+        instructions=load_prompt("guardrail"),
         model="gpt-4.1-mini",
         output_type=GuardrailResult,
     )
@@ -235,13 +245,13 @@ def create_lead_agent() -> Agent[CustomAgentContext]:
     today = datetime.now().strftime("%Y-%m-%d")
     return Agent[CustomAgentContext](
         name="Lead Agent",
-        instructions=f"""You are a helpful assistant that can answer questions and help with tasks. Always respond in Traditional Chinese. Today's date is {today}.""",
+        instructions=load_prompt("lead"),
         tools=[knowledge_search],
         #tools=[
-            #WebSearchTool(), 
+            #WebSearchTool(),
             #FileSearchTool(
             #  max_num_results=5,
-            #  vector_store_ids=[os.getenv("OPENAI_VECTOR_STORE_ID")],                
+            #  vector_store_ids=[os.getenv("OPENAI_VECTOR_STORE_ID")],
             #)
         #],
         model="gpt-5-mini",

@@ -49,6 +49,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
 
     chunks_result = []
     tags = []
+    last_token_usage = {}
 
     with braintrust_logger.start_span(name="agent_v3") as braintrust_span:
         with trace("FastAPI Agent v3", trace_id=f"trace_{thread_id}"):
@@ -101,6 +102,19 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
                         chunks_result.append(think_chunk)
                     elif event.type == "raw_response_event" and event.data.type == "response.completed":
                         print("completed")
+
+                        last_response_id = event.data.response.id 
+                        last_prompt_cache_hit_ratio = round((event.data.response.usage.input_tokens_details.cached_tokens / event.data.response.usage.input_tokens) * 100, 2)
+
+                        last_token_usage = {
+                            "input_tokens": event.data.response.usage.input_tokens,
+                            "cached_tokens": event.data.response.usage.input_tokens_details.cached_tokens,
+                            "output_tokens": event.data.response.usage.output_tokens,
+                            "reasoning_tokens": event.data.response.usage.output_tokens_details.reasoning_tokens,
+                            "total_tokens": event.data.response.usage.total_tokens,
+                            "prompt_cache_hit_ratio": last_prompt_cache_hit_ratio
+                        }                                            
+                                                
                     elif event.type == "run_item_stream_event":
                         if event.item.type == "tool_call_item":
                             print("-- Tool was called")
@@ -142,11 +156,12 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
             token_usage = result.context_wrapper.usage
             metadata = {
                 #"token_usage": asdict(token_usage),
+                "last_token_usage": last_token_usage,
                 "tags": tags
             }
             await save_agent_turn(thread_id, user_id, query, chunks_result, raw_items, metadata)
 
-            braintrust_span.log(output={ "chunks": chunks_result }, tags=tags, metadata={ "token_usage": token_usage })
+            braintrust_span.log(output={ "chunks": chunks_result }, tags=tags, metadata={ "total_token_usage": token_usage, "last_token_usage": last_token_usage })
 
 
     print(f"result: {result.context_wrapper}")

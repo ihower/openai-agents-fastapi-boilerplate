@@ -9,7 +9,7 @@ import asyncio
 import aiosqlite
 import braintrust
 from dataclasses import asdict
-
+from datetime import datetime
 app = FastAPI()
 
 # 掛載靜態文件目錄
@@ -56,6 +56,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
 
         custom_agent_context = CustomAgentContext(search_source={})
 
+        today_date = datetime.now().strftime("%Y-%m-%d")
         chunks_result = []
         tags = []
         last_token_usage = {}
@@ -84,6 +85,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
                 else:
 
                     agent_input_items = input_items + [ { "role": "user", "content": f"""
+                    Today's date: {today_date}
                     User background: <data>{extract_conversation_metadata_data}</data>
                     User Query: <query>{query}</query>
                     """ } ]

@@ -236,14 +236,14 @@ def create_lead_agent() -> Agent[CustomAgentContext]:
     return Agent[CustomAgentContext](
         name="Lead Agent",
         instructions=f"""You are a helpful assistant that can answer questions and help with tasks. Always respond in Traditional Chinese. Today's date is {today}.""",
-        #tools=[knowledge_search],
-        tools=[
-            WebSearchTool(), 
+        tools=[knowledge_search],
+        #tools=[
+            #WebSearchTool(), 
             #FileSearchTool(
             #  max_num_results=5,
             #  vector_store_ids=[os.getenv("OPENAI_VECTOR_STORE_ID")],                
             #)
-        ],
+        #],
         model="gpt-5-mini",
         model_settings=ModelSettings(
             reasoning={

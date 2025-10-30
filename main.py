@@ -163,8 +163,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
                     yield f"data: {json.dumps(data)}\n\n"
                     chunks_result.append(data)
 
-                done_event = { "message": "DONE" }
-                yield f"data: {json.dumps(done_event)}\n\n"
+                done_event = { "message": "DONE" }                
                 chunks_result.append(done_event)
 
                 # 儲存對話到資料庫
@@ -179,6 +178,7 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
 
                 braintrust_span.log(output={ "chunks": chunks_result }, tags=tags, metadata={ "total_token_usage": token_usage, "last_token_usage": last_token_usage })
 
-
+                yield f"data: {json.dumps(done_event)}\n\n" # 這會讓前端終止 streaming，結束整個 streaming response
+                
         print(f"total_token_usage: {result.context_wrapper.usage}")
         print(f"last_token_usage: {last_token_usage}")

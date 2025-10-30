@@ -22,7 +22,9 @@ from agent_core import (
     create_guardrail_agent,
     create_followup_questions_agent,
     create_lead_agent,
-    init_braintrust
+    init_braintrust,
+    check_input_guardrail,
+    extract_user_background
 )
 
 braintrust_logger, openai_client = init_braintrust()
@@ -34,13 +36,14 @@ async def get_agent_stream_v3(query: str, thread_id: str):
     return response
 
 async def generate_agent_stream_v3(query: str, thread_id: str):
-
     # Create agents using factory functions
     guardrail_agent = create_guardrail_agent()
     extract_followup_questions_agent = create_followup_questions_agent()
     lead_agent = create_lead_agent()
 
     session = CustomSQLiteSession(thread_id, "data/conversations.db", agent=lead_agent)
+    all_input_items = await session.get_items() + [{ "role": "user", "content": query }]
+
     custom_agent_context = CustomAgentContext(search_source={})
 
     chunks_result = []
@@ -52,7 +55,11 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
             braintrust_span.log(input={ "query": query },
                                 metadata={ "thread_id": thread_id })
 
-            result = await Runner.run(guardrail_agent, input=query)
+            async with asyncio.TaskGroup() as tg:
+                ta = tg.create_task( check_input_guardrail(all_input_items) ) # Need check whole conversation history
+                tb = tg.create_task( extract_user_background() )
+
+            result = ta.result()
 
             if not result.final_output.is_investment_question:
                 content = { "content": result.final_output.refusal_answer }                
@@ -60,6 +67,9 @@ async def generate_agent_stream_v3(query: str, thread_id: str):
                 chunks_result.append(content)
                 tags.append("gg") 
             else:
+                
+                background_data = tb.result()
+                print(f"background_data: {background_data}")
 
                 follow_up_questions_task = asyncio.create_task(  Runner.run(extract_followup_questions_agent, input=query, session=session) )
 

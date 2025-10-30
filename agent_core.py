@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from agents import Agent, function_tool, RunContextWrapper, ModelSettings, set_default_openai_client,  WebSearchTool, FileSearchTool
+from agents import Agent, Runner, function_tool, RunContextWrapper, ModelSettings, set_default_openai_client,  WebSearchTool, FileSearchTool
 from tavily import AsyncTavilyClient
 from datetime import datetime
 from openai import AsyncOpenAI
 import braintrust
 import os
+import asyncio
 
 braintrust_logger = None
 openai_client = None
@@ -51,7 +52,6 @@ async def knowledge_search(wrapper: RunContextWrapper[CustomAgentContext], query
 
     return str(result)
 
-# Pydantic Models
 class GuardrailResult(BaseModel):
     is_investment_question: bool
     refusal_answer: str = Field(description="The answer to the user's question if is_investment_question is False, otherwise leave it blank.")
@@ -103,3 +103,28 @@ def create_lead_agent() -> Agent[CustomAgentContext]:
             }
         )
     )
+
+# Just for demo, not used in the actual system
+@braintrust.traced
+async def extract_user_background():
+    await asyncio.sleep(3)
+
+    background = """
+User name: Foobar
+User age: 30
+User gender: Male
+User occupation: Software Engineer
+User income: 100000
+User education: Bachelor's degree
+User marital status: Married
+User has children: Yes
+User has pets: No
+"""
+    return background
+
+@braintrust.traced
+async def check_input_guardrail(input_items):
+    input_guardrail_agent = create_guardrail_agent()
+
+    result = await Runner.run(input_guardrail_agent, input=input_items)
+    return result    

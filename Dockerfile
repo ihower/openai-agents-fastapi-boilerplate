@@ -21,6 +21,9 @@ COPY . .
 # Create data directory for SQLite database
 RUN mkdir -p /app/data
 
+# Initialize database
+RUN uv run python migrate_agent_db.py
+
 # Expose port
 EXPOSE 7860
 

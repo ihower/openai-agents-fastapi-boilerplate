@@ -7,9 +7,74 @@ from openai import AsyncOpenAI
 import braintrust
 import os
 import asyncio
+import aiosqlite
+import json
 
 braintrust_logger = None
 openai_client = None
+
+DB_PATH = "data/agent.db"
+
+async def get_previous_items(thread_id: str) -> list:
+    """
+    根據 thread_id 從 agent_turns 取得最後一筆對話的 raw_items
+    如果沒有找到，返回空列表
+    """
+    input_items = []
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT raw_items FROM agent_turns WHERE thread_id = ? ORDER BY id DESC LIMIT 1",
+            (thread_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+
+            if row and row[0]:
+                try:
+                    raw_items_list = json.loads(row[0])
+                    for item_str in raw_items_list:
+                        parsed_item = json.loads(item_str)
+                        input_items.append(parsed_item)
+                    print(f"Loaded {len(input_items)} items from previous conversation")
+                except Exception as e:
+                    print(f"Error loading raw_items: {e}")
+
+    return input_items
+
+async def save_agent_turn(thread_id: str, user_id: int, query: str, chunks_result: list, raw_items: list, metadata: dict):
+    """
+    儲存對話記錄到 agent_turns
+    如果是新的 thread_id，也會在 agent_threads 建立記錄
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        # 檢查 thread_id 是否已存在於 agent_threads
+        async with db.execute(
+            "SELECT id FROM agent_threads WHERE thread_id = ?",
+            (thread_id,)
+        ) as cursor:
+            thread_exists = await cursor.fetchone()
+
+        if not thread_exists:
+            # 建立新的 thread
+            await db.execute(
+                "INSERT INTO agent_threads (thread_id, user_id) VALUES (?, ?)",
+                (thread_id, user_id)
+            )
+            print(f"Created new thread: {thread_id}")
+
+        # 準備要儲存的資料
+        raw_items_json = json.dumps(raw_items, ensure_ascii=False)
+        output_json = json.dumps(chunks_result, ensure_ascii=False)
+        metadata_json = json.dumps(metadata, ensure_ascii=False)
+
+        # 插入新的 agent_turn
+        await db.execute("""
+            INSERT INTO agent_turns (thread_id, user_id, input, output, raw_items, metadata)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (thread_id, user_id, query, output_json, raw_items_json, metadata_json))
+
+        await db.commit()
+        print(f"Saved conversation to database for thread: {thread_id}")
 
 def init_braintrust():
     global braintrust_logger, openai_client
@@ -107,7 +172,7 @@ def create_lead_agent() -> Agent[CustomAgentContext]:
 # Just for demo, not used in the actual system
 @braintrust.traced
 async def extract_user_background():
-    await asyncio.sleep(3)
+    await asyncio.sleep(2)
 
     background = """
 User name: Foobar

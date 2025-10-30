@@ -31,7 +31,13 @@ mkdir -p data
 uv sync
 ```
 
-5. Run development server:
+5. Run DB migration:
+
+```bash
+uv run python migrate_agent_db.py
+```
+
+6. Run development server:
 ```bash
 uv run uvicorn main:app --reload
 ```

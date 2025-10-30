@@ -23,7 +23,7 @@ from agent_core import (
     create_lead_agent,
     init_braintrust,
     check_input_guardrail,
-    extract_user_background,
+    extract_conversation_metadata,
     get_previous_items,
     save_agent_turn,
     context_editing
@@ -51,8 +51,6 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
         previous_tokens_usage = previous_metadata.get("last_token_usage", {}).get("total_tokens", 0)
         input_items = await context_editing(input_items, previous_tokens_usage)
 
-    all_input_items = input_items + [{ "role": "user", "content": query }]
-
     custom_agent_context = CustomAgentContext(search_source={})
 
     chunks_result = []
@@ -65,11 +63,15 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
             braintrust_span.log(input={ "query": query },
                                 metadata={ "thread_id": thread_id })
 
+            guardrail_input_items = input_items + [{ "role": "user", "content": query }]
+
+            # parallel tasks and wait for results together
             async with asyncio.TaskGroup() as tg:
-                ta = tg.create_task( check_input_guardrail(all_input_items) ) # Need check whole conversation history
-                tb = tg.create_task( extract_user_background() )
+                ta = tg.create_task( check_input_guardrail(guardrail_input_items) ) # Need check whole conversation history
+                tb = tg.create_task( extract_conversation_metadata() )
 
             result = ta.result()
+            extract_conversation_metadata_data = tb.result()
 
             if not result.final_output.is_investment_question:
                 content = { "content": result.final_output.refusal_answer }
@@ -78,14 +80,17 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
                 tags.append("gg")
             else:
 
-                background_data = tb.result()
-                print(f"background_data: {background_data}")
+                agent_input_items = input_items + [ { "role": "user", "content": f"""
+                User background: <data>{extract_conversation_metadata_data}</data>
+                User Query: <query>{query}</query>
+                """ } ]
 
+                # fire async task for follow-up questions
                 follow_up_questions_task = asyncio.create_task(
-                    Runner.run(extract_followup_questions_agent, input=all_input_items)
+                    Runner.run(extract_followup_questions_agent, input=agent_input_items)
                 )
 
-                result = Runner.run_streamed(lead_agent, input=all_input_items, context=custom_agent_context)
+                result = Runner.run_streamed(lead_agent, input=agent_input_items, context=custom_agent_context)
 
                 async for event in result.stream_events():
                     #print(event)

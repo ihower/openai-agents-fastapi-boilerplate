@@ -47,8 +47,8 @@ async def get_previous_items(thread_id: str) -> tuple[list, dict]:
     return input_items, metadata
 
 # Context Engineering 閾值設定
-TOOL_CALL_OUTPUT_TRIM_THRESHOLD = 1500  # 當 tokens 超過此值時，簡化 function_call_output
-TURN_BASED_TRIM_THRESHOLD = 2000  # 當 tokens 超過此值時，開始移除舊的對話輪次
+TOOL_CALL_OUTPUT_TRIM_THRESHOLD = 150000  # 當 tokens 超過此值時，簡化 function_call_output
+TURN_BASED_TRIM_THRESHOLD = 200000  # 當 tokens 超過此值時，開始移除舊的對話輪次
 TURN_BASED_TARGET_TOKENS = 50000  # Turn-based trimming 的目標 token 數量
 
 async def context_editing(input_items: list, used_tokens: int) -> list:
@@ -259,21 +259,13 @@ def create_lead_agent() -> Agent[CustomAgentContext]:
 
 # Just for demo, not used in the actual system
 @braintrust.traced
-async def extract_user_background():
+async def extract_conversation_metadata():
     await asyncio.sleep(2)
 
-    background = """
-User name: Foobar
-User age: 30
-User gender: Male
-User occupation: Software Engineer
-User income: 100000
-User education: Bachelor's degree
-User marital status: Married
-User has children: Yes
-User has pets: No
-"""
-    return background
+    return {
+        "user_sentiment": "positive",
+        "user_intent": "investment"
+    }
 
 @braintrust.traced
 async def check_input_guardrail(input_items):

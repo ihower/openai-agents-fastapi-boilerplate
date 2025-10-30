@@ -25,7 +25,8 @@ from agent_core import (
     check_input_guardrail,
     extract_user_background,
     get_previous_items,
-    save_agent_turn
+    save_agent_turn,
+    context_editing
 )
 
 braintrust_logger, openai_client = init_braintrust()
@@ -42,7 +43,14 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
     lead_agent = create_lead_agent()
 
     # 從資料庫讀取歷史對話
-    input_items = await get_previous_items(thread_id)
+    input_items, previous_metadata = await get_previous_items(thread_id)
+
+    # 如果有歷史對話，進行 context editing
+    if input_items:
+        print(f"previous_metadata: {previous_metadata}")
+        previous_tokens_usage = previous_metadata.get("last_token_usage", {}).get("total_tokens", 0)
+        input_items = await context_editing(input_items, previous_tokens_usage)
+
     all_input_items = input_items + [{ "role": "user", "content": query }]
 
     custom_agent_context = CustomAgentContext(search_source={})
@@ -164,4 +172,5 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
             braintrust_span.log(output={ "chunks": chunks_result }, tags=tags, metadata={ "total_token_usage": token_usage, "last_token_usage": last_token_usage })
 
 
-    print(f"result: {result.context_wrapper}")
+    print(f"total_token_usage: {result.context_wrapper.usage}")
+    print(f"last_token_usage: {last_token_usage}")

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from agents import Agent, Runner, function_tool, RunContextWrapper, ModelSettings, set_default_openai_client,  WebSearchTool, FileSearchTool
+from agents import Agent, Runner, function_tool, RunContextWrapper, ModelSettings, set_default_openai_client, WebSearchTool, FileSearchTool
 from tavily import AsyncTavilyClient
 from datetime import datetime
 from openai import AsyncOpenAI
@@ -9,22 +9,24 @@ import os
 import asyncio
 import aiosqlite
 import json
+from utils import count_tokens
 
 braintrust_logger = None
 openai_client = None
 
 DB_PATH = "data/agent.db"
 
-async def get_previous_items(thread_id: str) -> list:
+async def get_previous_items(thread_id: str) -> tuple[list, dict]:
     """
-    根據 thread_id 從 agent_turns 取得最後一筆對話的 raw_items
-    如果沒有找到，返回空列表
+    根據 thread_id 從 agent_turns 取得最後一筆對話的 raw_items 和 metadata
+    如果沒有找到，返回空列表和空字典
     """
     input_items = []
+    metadata = {}
 
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute(
-            "SELECT raw_items FROM agent_turns WHERE thread_id = ? ORDER BY id DESC LIMIT 1",
+            "SELECT raw_items, metadata FROM agent_turns WHERE thread_id = ? ORDER BY id DESC LIMIT 1",
             (thread_id,)
         ) as cursor:
             row = await cursor.fetchone()
@@ -36,8 +38,94 @@ async def get_previous_items(thread_id: str) -> list:
                         parsed_item = json.loads(item_str)
                         input_items.append(parsed_item)
                     print(f"Loaded {len(input_items)} items from previous conversation")
+
+                    if row[1]:
+                        metadata = json.loads(row[1])
                 except Exception as e:
                     print(f"Error loading raw_items: {e}")
+
+    return input_items, metadata
+
+# Context Engineering 閾值設定
+TOOL_CALL_OUTPUT_TRIM_THRESHOLD = 1500  # 當 tokens 超過此值時，簡化 function_call_output
+TURN_BASED_TRIM_THRESHOLD = 2000  # 當 tokens 超過此值時，開始移除舊的對話輪次
+TURN_BASED_TARGET_TOKENS = 50000  # Turn-based trimming 的目標 token 數量
+
+async def context_editing(input_items: list, used_tokens: int) -> list:
+    """
+    對 input_items 進行 context engineering，根據 token 使用情況進行剪裁
+
+    Args:
+        input_items: 要處理的對話記錄
+        used_tokens: 前一次對話使用的 tokens 數量
+
+    Returns:
+        處理後的 input_items
+    """
+    print(f"previous used_tokens: {used_tokens}")
+
+    # Context Engineering 1: Tool call output trimming
+    # 當 tokens 超過閾值時，簡化 function_call_output 內容
+    if used_tokens > TOOL_CALL_OUTPUT_TRIM_THRESHOLD:
+        print(f"Trigger tool call output filter: used_tokens={used_tokens}")
+        for item in input_items:
+            if item.get("type") == "function_call_output":
+                print(" remove function_call_output! ")
+                item["output"] = "Tool results removed (context limit). Re-run the tool if needed."
+
+        print(f"After tool call filter")
+
+    # Context Engineering 2: Turn-based trimming
+    # 當 tokens 超過閾值時，按 user turns 移除最舊的對話
+    if used_tokens > TURN_BASED_TRIM_THRESHOLD:
+        print(f"Trigger turn-based message filter: used_tokens={used_tokens}")
+
+        # 按 user role 切分 turns
+        turns = []  # nested list
+        current_turn = []
+
+        for item in input_items:
+            if item.get("role") == "user" and current_turn:
+                # 遇到新的 user message，結束當前 turn
+                turns.append(current_turn)
+                current_turn = [item]
+            else:
+                current_turn.append(item)
+
+        # 添加最後一個 turn
+        if current_turn:
+            turns.append(current_turn)
+
+        # 計算每個 turn 的 tokens 數量
+        turn_tokens = []
+        for i, turn in enumerate(turns):
+            turn_content = ""
+            for item in turn:
+                if item.get("content"):
+                    turn_content += str(item.get("content", ""))
+                if item.get("output"):
+                    turn_content += str(item.get("output", ""))
+
+            tokens = count_tokens(turn_content)
+            turn_tokens.append((i, tokens, turn))
+
+        # 從最舊的 turn 開始移除，直到總 tokens 低於目標值
+        total_tokens = sum(tokens for _, tokens, _ in turn_tokens)
+        removed_turns = 0
+
+        while total_tokens > TURN_BASED_TARGET_TOKENS and len(turn_tokens) > 1:  # 保留至少1個 turn
+            # 移除最舊的 turn (索引最小的)
+            removed_turn = turn_tokens.pop(0)
+            total_tokens -= removed_turn[1]
+            removed_turns += 1
+            print(f"Removed turn {removed_turn[0]} with {removed_turn[1]} tokens")
+
+        # 重建 items
+        input_items = []
+        for _, _, turn in turn_tokens:
+            input_items.extend(turn)
+
+        print(f"Token management: removed {removed_turns} turns, remaining tokens: {total_tokens}")
 
     return input_items
 

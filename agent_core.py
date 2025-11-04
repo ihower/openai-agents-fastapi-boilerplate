@@ -216,7 +216,7 @@ async def knowledge_search(wrapper: RunContextWrapper[CustomAgentContext], query
 
 class GuardrailResult(BaseModel):
     allow: bool
-    refusal_answer: str = Field(description="The reply to the user's question if is_investment_question is False, otherwise leave it blank.")
+    refusal_answer: str = Field(description="The reply to the user's question if allow is False, otherwise leave it blank.")
 
 class ExtractFollowupQuestionsResult(BaseModel):
     followup_questions: list[str] = Field(description="3 follow-up questions exploring different aspects of the topic.")

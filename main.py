@@ -184,3 +184,30 @@ async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1)
                 
         print(f"total_token_usage: {result.context_wrapper.usage}")
         print(f"last_token_usage: {last_token_usage}")
+
+# For SSE testing, send fake SSE messages
+@app.get("/api/test-sse")
+async def test_sse():
+    response = StreamingResponse(generate_test_sse(), media_type="text/event-stream")
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
+
+async def generate_test_sse():
+    duration = 60  # seconds
+    interval = 0.05  # seconds
+    iterations = int(duration / interval)
+
+    for i in range(iterations):
+        fake_message = {
+            "type": "MESSAGE",
+            "content": i + 1
+        }
+        yield f"data: {json.dumps(fake_message)}\n\n"
+        await asyncio.sleep(interval)
+
+    # Send final message
+    final_message = {
+        "type": "DONE",
+        "total_messages": iterations
+    }
+    yield f"data: {json.dumps(final_message)}\n\n"        

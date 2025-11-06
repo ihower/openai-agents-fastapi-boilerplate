@@ -1,6 +1,6 @@
-# OpenAI Agents SDK + FastAPI Boilerplate
+# OpenAI Agents SDK + FastAPI Playbook
 
-A FastAPI boilerplate integrating OpenAI Agents SDK with Braintrust observability.
+A FastAPI sample application integrating OpenAI Agents SDK with Braintrust observability.
 
 ## Prerequisites
 
@@ -9,6 +9,10 @@ A FastAPI boilerplate integrating OpenAI Agents SDK with Braintrust observabilit
   - OpenAI
   - Tavily
   - Braintrust
+
+## Features
+
+(TBD)
 
 ## Setup
 
@@ -38,13 +42,20 @@ uv run python migrate_agent_db.py
 ```
 
 6. Run development server:
+
 ```bash
-uv run uvicorn main:app --reload
+uv run fastapi dev
 ```
 
-6. Open http://localhost:8000/static/agent.html
+6. Open http://localhost:8000
 
 ## Production
+
+```bash
+uv run fastapi run
+```
+
+See https://fastapi.tiangolo.com/deployment/manually/ 
 
 ### Using Docker
 
@@ -54,20 +65,10 @@ Set up `.env` first, then run:
 docker compose up
 ```
 
+Open http://localhost:8000
+
 If you change the app code, you need to rebuild:
 
 ```bash
 docker compose build
-```
-
-### Local
-
-Run with multiple workers using Gunicorn:
-
-```bash
-uv run gunicorn main:app \
-  --workers 3 \
-  --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000 \
-  --timeout 600
 ```

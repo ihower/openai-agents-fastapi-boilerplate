@@ -28,4 +28,4 @@ RUN uv run python migrate_agent_db.py
 EXPOSE 7860
 
 # Run the application
-CMD ["uv", "run", "gunicorn", "main:app", "--workers", "3", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:7860", "--timeout", "600"]
+CMD ["uv", "run", "fastapi", "run", "--host", "0.0.0.0", "--port", "7860"]

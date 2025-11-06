@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv(".env", override=True)
 
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import json
 import asyncio
@@ -14,6 +14,11 @@ app = FastAPI()
 
 # 掛載靜態文件目錄
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 首頁路由
+@app.get("/")
+async def read_root():
+    return FileResponse("static/index.html")
 
 DB_PATH = "data/agent.db"
 

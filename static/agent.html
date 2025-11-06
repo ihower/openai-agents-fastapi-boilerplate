@@ -80,10 +80,6 @@
             margin-top: 10px;
             color: #666;
         }
-        .header {
-            margin-bottom: 15px;
-            text-align: center;
-        }
         .following-questions {
             margin-top: 20px;
             padding: 15px;
@@ -219,9 +215,6 @@
 <body>
     <div class="container">
         <div class="left-column">
-            <div class="header">
-                <h2>Agent 對話 (Chat 介面)</h2>
-            </div>
             <form class="chat-form" id="chatForm">
                 <textarea id="query" placeholder="請輸入您的內容..."></textarea>
                 <div class="loading" id="loading">處理中...</div>
@@ -232,9 +225,6 @@
             </form>
         </div>
         <div class="right-column">
-            <div class="header">
-                <h2>回應內容</h2>
-            </div>
             <div id="response_content"></div>
             <div id="response_questions"></div>
         </div>
@@ -294,7 +284,6 @@
 
             const eventSource = new EventSource(apiUrl);
 
-            let thinkingBlocksContainer = null;
             let contentDiv = null;
 
             eventSource.onmessage = function(event) {
@@ -312,23 +301,11 @@
                 }
 
                 if (jsonData.message === "THINK_START") {
-                    // 創建思考區域容器（如果還沒有的話）
-                    if (!thinkingBlocksContainer) {
-                        thinkingBlocksContainer = document.createElement('div');
-                        aiMessageDiv.appendChild(thinkingBlocksContainer);
-                    }
-
                     const thinkingIndicator = document.createElement('div');
                     thinkingIndicator.className = 'thinking-block';
                     thinkingIndicator.innerHTML = '<div class="thinking-indicator">💭 進行思考</div>';
-                    thinkingBlocksContainer.appendChild(thinkingIndicator);
+                    aiMessageDiv.appendChild(thinkingIndicator);
                 } else if (jsonData.message === "THINK_TEXT") {
-                    // 添加思考內容區塊
-                    if (!thinkingBlocksContainer) {
-                        thinkingBlocksContainer = document.createElement('div');
-                        aiMessageDiv.appendChild(thinkingBlocksContainer);
-                    }
-
                     const thinkingTextBlock = document.createElement('div');
                     thinkingTextBlock.className = 'thinking-block';
 
@@ -339,17 +316,12 @@
                         <div class="thinking-indicator">🧠 思考摘要：</div>
                         <div class="thinking-text markdown-content">${renderedThinkText}</div>
                     `;
-                    thinkingBlocksContainer.appendChild(thinkingTextBlock);
+                    aiMessageDiv.appendChild(thinkingTextBlock);
                 } else if (jsonData.message === "CALL_TOOL") {
-                    // 創建主文內容區塊（如果還沒有的話）
-                    if (!contentDiv) {
-                        contentDiv = document.createElement('div');
-                        contentDiv.style.marginTop = '10px';
-                        aiMessageDiv.appendChild(contentDiv);
-                    }
-
-                    const toolMessage = `<span style="color: #666; font-style: italic; margin: 5px 0; padding: 8px; border: 1px dashed #999; border-radius: 5px; display: block;">🔧 執行工具: ${jsonData.tool_name} 參數 ${jsonData.arguments} ⚙️</span>`;
-                    contentDiv.innerHTML += toolMessage;
+                    const toolMessageSpan = document.createElement('span');
+                    toolMessageSpan.style.cssText = 'color: #666; font-style: italic; margin: 5px 0; padding: 8px; border: 1px dashed #999; border-radius: 5px; display: block;';
+                    toolMessageSpan.textContent = `🔧 執行工具: ${jsonData.tool_name} 參數 ${jsonData.arguments} ⚙️`;
+                    aiMessageDiv.appendChild(toolMessageSpan);
                 } else if (jsonData.content) {
                     // 創建主文內容區塊（如果還沒有的話）
                     if (!contentDiv) {

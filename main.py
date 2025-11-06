@@ -46,6 +46,9 @@ async def get_agent_stream_v3(query: str, thread_id: str):
 
 async def generate_agent_stream_v3(query: str, thread_id: str, user_id: int = 1):
     async with aiosqlite.connect(DB_PATH) as db:
+        # Enable WAL mode for better performance
+        await db.execute("PRAGMA journal_mode=WAL;")
+
         # Create agents using factory functions
         extract_followup_questions_agent = create_followup_questions_agent()
         lead_agent = create_lead_agent()
